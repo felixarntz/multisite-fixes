@@ -25,24 +25,22 @@ class WPMS_SSL_Redirects {
 	}
 
 	public static function maybe_redirect_https() {
-		if ( is_ssl() ) {
-			return;
-		}
+		if ( self::is_ssl_site() && ! is_ssl() ) {
+			$host = isset( $_SERVER['HTTP_HOST'] ) ? $_SERVER['HTTP_HOST'] : $_SERVER['SERVER_NAME'];
+			$path = $_SERVER['REQUEST_URI'];
 
+			wp_redirect( 'https://' . $host . $path, 301 );
+			exit;
+		}
+	}
+
+	public static function maybe_force_ssl_admin() {
 		if ( self::is_ssl_site() ) {
 			if ( ! defined( 'FORCE_SSL_ADMIN' ) ) {
 				define( 'FORCE_SSL_ADMIN', true );
 			}
 			if ( ! defined( 'FORCE_SSL_LOGIN' ) ) {
 				define( 'FORCE_SSL_LOGIN', true );
-			}
-
-			if ( ! is_ssl() ) {
-				$host = isset( $_SERVER['HTTP_HOST'] ) ? $_SERVER['HTTP_HOST'] : $_SERVER['SERVER_NAME'];
-				$path = $_SERVER['REQUEST_URI'];
-
-				wp_redirect( 'https://' . $host . $path, 301 );
-				exit;
 			}
 		}
 	}
@@ -90,7 +88,8 @@ class WPMS_SSL_Redirects {
 }
 
 if ( is_multisite() && ( defined( 'SSL_GLOBAL' ) || defined( 'SSL_NETWORKS' ) || defined( 'SSL_SITES' ) ) ) {
-	add_action( 'muplugins_loaded', array( 'WPMS_SSL_Redirects', 'maybe_redirect_https' ), 1 );
+	add_action( 'muplugins_loaded', array( 'WPMS_SSL_Redirects', 'maybe_force_ssl_admin' ), 1 );
+	add_action( 'plugins_loaded', array( 'WPMS_SSL_Redirects', 'maybe_redirect_https' ), 1 );
 	add_filter( 'option_home', array( 'WPMS_SSL_Redirects', 'maybe_make_url_https' ) );
 	add_filter( 'option_siteurl', array( 'WPMS_SSL_Redirects', 'maybe_make_url_https' ) );
 	add_filter( 'the_content', array( 'WPMS_SSL_Redirects', 'maybe_make_url_https' ) );
