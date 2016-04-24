@@ -40,10 +40,14 @@ class WPMN_Global_Admins {
 		global $wpdb;
 
 		$all_networks = $wpdb->get_col( "SELECT id FROM {$wpdb->site}" );
-		$user_networks = array();
-		foreach ( $all_networks as $network_id ) {
-			if ( self::is_network_admin( $user_id, $network_id ) ) {
-				$user_networks[] = (int) $network_id;
+		if ( self::is_global_admin( $user_id ) ) {
+			$user_networks = $all_networks;
+		} else {
+			$user_networks = array();
+			foreach ( $all_networks as $network_id ) {
+				if ( self::is_network_admin( $user_id, $network_id ) ) {
+					$user_networks[] = (int) $network_id;
+				}
 			}
 		}
 
