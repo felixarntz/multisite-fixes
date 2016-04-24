@@ -17,6 +17,10 @@ class WPMN_Global_Admins {
 	public static function map_meta_cap( $caps, $cap, $user_id, $args ) {
 		switch ( $cap ) {
 			case 'manage_cache': // for WP Spider Cache plugin
+			case 'manage_networks':
+			case 'create_networks':
+			case 'delete_networks':
+			case 'delete_network':
 			case 'manage_global_users':
 				if ( ! self::is_global_admin( $user_id ) ) {
 					$caps[] = 'do_not_allow';
@@ -30,6 +34,24 @@ class WPMN_Global_Admins {
 		}
 
 		return $caps;
+	}
+
+	public static function user_has_networks( $networks, $user_id ) {
+		global $wpdb;
+
+		$all_networks = $wpdb->get_col( "SELECT id FROM {$wpdb->site}" );
+		$user_networks = array();
+		foreach ( $all_networks as $network_id ) {
+			if ( self::is_network_admin( $user_id, $network_id ) ) {
+				$user_networks[] = (int) $network_id;
+			}
+		}
+
+		if ( empty( $user_networks ) ) {
+			$user_networks = false;
+		}
+
+		return $user_networks;
 	}
 
 	public static function pre_user_query( &$user_query ) {
@@ -48,7 +70,7 @@ class WPMN_Global_Admins {
 		$site_queries = array();
 		foreach ( $sites as $site ) {
 			$site_queries[] = array(
-				'key'		=> $wpdb->get_blog_prefix( $site->blog_id ) . 'capabilities',
+				'key'		=> $wpdb->get_blog_prefix( $site['blog_id'] ) . 'capabilities',
 				'compare'	=> 'EXISTS',
 			);
 		}
@@ -81,6 +103,16 @@ class WPMN_Global_Admins {
 		return $user && $user->exists() && in_array( $user->user_login, $global_admins, true );
 	}
 
+	public static function is_network_admin( $user_id, $network_id = null ) {
+		$network_admins = self::get_network_admins( $network_id );
+		if ( empty( $network_admins ) ) {
+			return false;
+		}
+
+		$user = get_user_by( 'id', $user_id );
+		return $user && $user->exists() && in_array( $user->user_login, $network_admins, true );
+	}
+
 	public static function get_global_admins() {
 		if ( ! defined( 'WP_GLOBAL_ADMINS' ) ) {
 			return array();
@@ -105,5 +137,6 @@ class WPMN_Global_Admins {
 if ( is_multisite() && ( defined( 'WP_GLOBAL_ADMINS' ) || defined( 'WP_NETWORK_1_ADMINS' ) ) ) {
 	WPMN_Global_Admins::set_super_admins();
 	add_filter( 'map_meta_cap', array( 'WPMN_Global_Admins', 'map_meta_cap' ), 10, 4 );
+	add_filter( 'networks_user_is_network_admin', array( 'WPMN_Global_Admins', 'user_has_networks' ), 10, 2 );
 	add_action( 'pre_user_query', array( 'WPMN_Global_Admins', 'pre_user_query' ), 10, 1 );
 }
