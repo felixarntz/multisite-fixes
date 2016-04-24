@@ -25,3 +25,5 @@ All parts of this repository can be used individually as needed. You don't have 
 ## Be aware
 
 Everything here should only be used for subdomain (or domain) setups. Do not use with subdirectory setups!
+
+Some of the code requires at least WordPress version 4.4.
