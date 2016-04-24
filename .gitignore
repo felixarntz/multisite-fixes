@@ -1,0 +1,32 @@
+# Vendor (e.g. Composer)
+composer.lock
+vendor/*
+
+# Node Package Manager
+node_modules
+
+# Vagrant
+bin
+.vagrant
+
+# IDEs
+*.pydevproject
+.project
+.metadata
+*.swp
+*~.nib
+local.properties
+.classpath
+.settings/
+.loadpath
+.externalToolBuilders/
+*.launch
+.cproject
+.buildpath
+nbproject/
+
+# OSes
+[Tt]humbs.db
+[Dd]esktop.ini
+*.DS_store
+.DS_store?
