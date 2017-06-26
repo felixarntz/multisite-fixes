@@ -15,25 +15,31 @@ defined( 'ABSPATH' ) || exit;
 
 class WPMS_Site_URL_Fixer {
 	public static function fix_home_url( $value ) {
-		if ( '/' . self::get_directory() === substr( $value, -5 ) ) {
-			$value = substr( $value, 0, -5 );
+		$core_directory = self::get_directory();
+
+		if ( '/' . $core_directory === substr( $value, - strlen( $core_directory ) - 1 ) ) {
+			$value = substr( $value, 0, - strlen( $core_directory ) - 1 );
 		}
 		return $value;
 	}
 
 	public static function fix_site_url( $value ) {
-		if ( '/' . self::get_directory() !== substr( $value, -5 ) ) {
-			$value .= '/' . self::get_directory();
+		$core_directory = self::get_directory();
+
+		if ( '/' . $core_directory !== substr( $value, - strlen( $core_directory ) - 1 ) ) {
+			$value .= '/' . $core_directory;
 		}
 		return $value;
 	}
 
 	public static function fix_network_site_url( $url, $path, $scheme ) {
+		$core_directory = self::get_directory();
+
 		$path = ltrim( $path, '/' );
 		$url = substr( $url, 0, strlen( $url ) - strlen( $path ) );
 
-		if ( self::get_directory() . '/' !== substr( $url, -5 ) ) {
-			$url .= self::get_directory() . '/';
+		if ( $core_directory . '/' !== substr( $url, - strlen( $core_directory ) - 1 ) ) {
+			$url .= $core_directory . '/';
 		}
 
 		return $url . $path;
