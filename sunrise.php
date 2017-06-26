@@ -12,7 +12,22 @@ License URI: http://www.gnu.org/licenses/gpl-2.0.html
 // Exit if accessed directly
 defined( 'ABSPATH' ) || exit;
 
+/**
+ * Class to bootstrap multisite. Does not work in a subdirectory environment.
+ *
+ * @since 1.0.0
+ */
 class WPMS_Sunrise {
+
+	/**
+	 * Bootstraps multisite by setting up the current site and network.
+	 *
+	 * If either of the two cannot be detected, this method will terminate the current PHP process.
+	 *
+	 * @since 1.0.0
+	 * @access public
+	 * @static
+	 */
 	public static function bootstrap() {
 		if ( ! is_multisite() ) {
 			// Skip if not a multisite.
@@ -102,6 +117,16 @@ class WPMS_Sunrise {
 		self::expose_globals( $site, $network );
 	}
 
+	/**
+	 * Detects the current site from given domains.
+	 *
+	 * @since 1.0.0
+	 * @access private
+	 * @static
+	 *
+	 * @param array $domains Array of domains for the current site.
+	 * @return WP_Site|false The current site, or false on failure.
+	 */
 	private static function detect_site( $domains = array() ) {
 		$sites = get_sites( array(
 			'number'     => 1,
@@ -117,6 +142,17 @@ class WPMS_Sunrise {
 		return array_shift( $sites );
 	}
 
+	/**
+	 * Detects the current network from given domains or the current site object.
+	 *
+	 * @since 1.0.0
+	 * @access private
+	 * @static
+	 *
+	 * @param array|WP_Site $domains_or_site Either an array of domains for the current network, or the current
+	 *                                       site object.
+	 * @return WP_Network|false The current network, or false on failure.
+	 */
 	private static function detect_network( $domains_or_site = array() ) {
 		if ( is_a( $domains_or_site, 'WP_Site' ) ) {
 			return WP_Network::get_instance( $domains_or_site->network_id );
@@ -136,6 +172,16 @@ class WPMS_Sunrise {
 		return array_shift( $networks );
 	}
 
+	/**
+	 * Detects the main site ID for a given network.
+	 *
+	 * @since 1.0.0
+	 * @access private
+	 * @static
+	 *
+	 * @param WP_Network A network object.
+	 * @return int Main site ID for the network, or 0 if none found.
+	 */
 	private static function detect_network_main_site_id( $network ) {
 		$main_site_id = wp_cache_get( 'network:' . $network->id . ':main_site', 'site-options' );
 
@@ -160,6 +206,17 @@ class WPMS_Sunrise {
 		return $main_site_id;
 	}
 
+	/**
+	 * Terminates the PHP process and triggers proper action hooks or redirects depending on the error.
+	 *
+	 * @since 1.0.0
+	 * @access private
+	 * @static
+	 *
+	 * @param string $domain Domain for the current request.
+	 * @param string $mode   Optional. Which part of the lookup failed. Either 'site' or 'network'.
+	 *                       Default 'site'.
+	 */
 	private static function fail_gracefully( $domain, $mode = 'site' ) {
 		if ( 'network' === $mode ) {
 			do_action( 'ms_network_not_found', $domain, '/' );
@@ -171,6 +228,18 @@ class WPMS_Sunrise {
 		ms_not_installed( $domain, '/' );
 	}
 
+	/**
+	 * Exposes the necessary WordPress globals for the detected current site and network.
+	 *
+	 * It furthermore loads the network options.
+	 *
+	 * @since 1.0.0
+	 * @access private
+	 * @static
+	 *
+	 * @param WP_Site    $site    Current site object.
+	 * @param WP_Network $network Current network object.
+	 */
 	private static function expose_globals( $site, $network ) {
 		global $current_blog, $current_site, $blog_id, $site_id, $public;
 
@@ -185,6 +254,15 @@ class WPMS_Sunrise {
 		wp_load_core_site_options( $network->id );
 	}
 
+	/**
+	 * Redirects the current request to another domain.
+	 *
+	 * @since 1.0.0
+	 * @access private
+	 * @static
+	 *
+	 * @param string $domain Domain to redirect to.
+	 */
 	private static function redirect( $domain ) {
 		$protocol = self::get_current_protocol();
 		$path = self::get_current_path();
@@ -193,6 +271,15 @@ class WPMS_Sunrise {
 		exit;
 	}
 
+	/**
+	 * Gets the domain for the current request.
+	 *
+	 * @since 1.0.0
+	 * @access private
+	 * @static
+	 *
+	 * @return string The current domain.
+	 */
 	private static function get_current_domain() {
 		$domain = strtolower( stripslashes( $_SERVER['HTTP_HOST'] ) );
 		if ( ':80' === substr( $domain, -3 ) ) {
@@ -206,10 +293,28 @@ class WPMS_Sunrise {
 		return $domain;
 	}
 
+	/**
+	 * Gets the path for the current request.
+	 *
+	 * @since 1.0.0
+	 * @access private
+	 * @static
+	 *
+	 * @return string The current path.
+	 */
 	private static function get_current_path() {
 		return stripslashes( $_SERVER['REQUEST_URI'] );
 	}
 
+	/**
+	 * Gets the protocol for the current request.
+	 *
+	 * @since 1.0.0
+	 * @access private
+	 * @static
+	 *
+	 * @return string The current protocol.
+	 */
 	private static function get_current_protocol() {
 		if ( function_exists( 'is_ssl' ) ) {
 			if ( is_ssl() ) {
