@@ -14,17 +14,39 @@ defined( 'ABSPATH' ) || exit;
 
 class WPMS_Sunrise {
 	public static function bootstrap() {
-		global $wpdb;
-
 		if ( ! is_multisite() ) {
-			// skip if not a multisite
+			// Skip if not a multisite.
 			return;
 		}
 
 		if ( ! is_subdomain_install() ) {
-			// die if a subdirectory install
+			// Fail if a subdirectory install.
 			wp_die( 'This multisite does not support a subdirectory installation.', 'Multisite Error', array( 'response' => 500 ) );
 			exit;
+		}
+
+		// If we're installing, setup dummy objects and bail early.
+		if ( wp_installing() ) {
+			$site = new stdClass();
+			$site->id = 1;
+			$site->network_id = 1;
+			$site->domain = '';
+			$site->path = '/';
+			$site->public = 1;
+			// Back-compat
+			$site->blog_id = 1;
+			$site->site_id = 1;
+
+			$network = new stdClass();
+			$network->id = 1;
+			$network->site_id = 1;
+			$network->domain = '';
+			$network->path = '/';
+			// Back-compat
+			$network->blog_id = 1;
+
+			self::expose_globals( $site, $network );
+			return;
 		}
 
 		$domain = self::get_current_domain();
@@ -43,27 +65,17 @@ class WPMS_Sunrise {
 				exit;
 			}
 
-			if ( empty( $site->site_id ) ) {
-				$site->site_id = 1;
+			if ( empty( $site->network_id ) ) {
+				$site->network_id = 1;
 			}
 
 			$network = self::detect_network( $site );
 		} else {
-			// try to detect network another way if no site is found
+			// Try to detect network another way if no site is found.
 			$network = self::detect_network( $domains );
 			if ( $network && $domain !== $network->domain ) {
 				self::redirect( $network->domain );
 				exit;
-			}
-
-			if ( wp_installing() ) {
-				// create dummy site if we're installing
-				$site = new stdClass();
-				$site->blog_id = 1;
-				$site->site_id = 1;
-				$site->domain = '';
-				$site->path = '/';
-				$site->public = 1;
 			}
 		}
 
@@ -77,48 +89,75 @@ class WPMS_Sunrise {
 			exit;
 		}
 
-		// detect the network's main site ID if not set yet
-		if ( empty( $network->blog_id ) ) {
+		// Detect the network's main site ID if not set yet.
+		if ( empty( $network->site_id ) ) {
 			if ( $site->domain === $network->domain && $site->path === $network->path ) {
-				$network->blog_id = $site->blog_id;
-			} elseif ( ! ( $network->blog_id = wp_cache_get( 'network:' . $network->id . ':main_site', 'site-options' ) ) ) {
-				$network->blog_id = $wpdb->get_var( $wpdb->prepare( "SELECT blog_id FROM $wpdb->blogs WHERE domain = %s AND path = %s;", $network->domain, $network->path ) );
-				wp_cache_add( 'network:' . $network->id . ':main_site', $network->blog_id, 'site-options' );
+				$network->site_id = $site->id;
+			} else {
+				$network->site_id = self::detect_network_main_site_id( $network );
 			}
 		}
 
-		// if we reach this point, everything has been detected successfully
+		// If we reach this point, everything has been detected successfully.
 		self::expose_globals( $site, $network );
 	}
 
 	private static function detect_site( $domains = array() ) {
-		global $wpdb;
+		$sites = get_sites( array(
+			'number'     => 1,
+			'domain__in' => $domains,
+			'path'       => '/',
+			'orderby'    => array( 'domain_length' => 'DESC' ),
+		) );
 
-		$search_domains = "'" . implode( "','", $wpdb->_escape( $domains ) ) . "'";
-
-		$site = $wpdb->get_row( "SELECT * FROM $wpdb->blogs WHERE domain IN ($search_domains) AND path = '/' ORDER BY CHAR_LENGTH(domain) DESC, CHAR_LENGTH(path) DESC LIMIT 1;" );
-		if ( ! empty( $site ) && ! is_wp_error( $site ) ) {
-			return $site;
+		if ( empty( $sites ) ) {
+			return false;
 		}
 
-		return false;
+		return array_shift( $sites );
 	}
 
 	private static function detect_network( $domains_or_site = array() ) {
-		global $wpdb;
-
-		if ( is_object( $domains_or_site ) && isset( $domains_or_site->site_id ) ) {
-			return WP_Network::get_instance( $domains_or_site->site_id );
+		if ( is_a( $domains_or_site, 'WP_Site' ) ) {
+			return WP_Network::get_instance( $domains_or_site->network_id );
 		}
 
-		$search_domains = "'" . implode( "','", $wpdb->_escape( $domains_or_site ) ) . "'";
+		$networks = get_networks( array(
+			'number'     => 1,
+			'domain__in' => $domains,
+			'path'       => '/',
+			'orderby'    => array( 'domain_length' => 'DESC' ),
+		) );
 
-		$network = $wpdb->get_row( "SELECT * FROM $wpdb->site WHERE domain IN ($search_domains) AND path = '/' ORDER BY CHAR_LENGTH(domain) DESC, CHAR_LENGTH(path) DESC LIMIT 1;" );
-		if ( ! empty( $network ) && ! is_wp_error( $network ) ) {
-			return new WP_Network( $network );
+		if ( empty( $networks ) ) {
+			return false;
 		}
 
-		return false;
+		return array_shift( $networks );
+	}
+
+	private static function detect_network_main_site_id( $network ) {
+		$main_site_id = wp_cache_get( 'network:' . $network->id . ':main_site', 'site-options' );
+
+		if ( false === $main_site_id ) {
+			$main_site_ids = get_sites( array(
+				'number'     => 1,
+				'fields'     => 'ids',
+				'domain'     => $network->domain,
+				'path'       => $network->path,
+				'network_id' => $network->id,
+			) );
+
+			if ( ! empty( $main_site_ids ) ) {
+				$main_site_id = array_shift( $main_site_ids );
+			} else {
+				$main_site_id = 0;
+			}
+
+			wp_cache_add( 'network:' . $network->id . ':main_site', $main_site_id, 'site-options' );
+		}
+
+		return $main_site_id;
 	}
 
 	private static function fail_gracefully( $domain, $mode = 'site' ) {
@@ -138,12 +177,12 @@ class WPMS_Sunrise {
 		$current_blog = $site;
 		$current_site = $network;
 
-		$blog_id = $site->blog_id;
-		$site_id = $site->site_id;
+		$blog_id = $site->id;
+		$site_id = $network->id;
 
 		$public = $site->public;
 
-		wp_load_core_site_options( $site_id );
+		wp_load_core_site_options( $network->id );
 	}
 
 	private static function redirect( $domain ) {
