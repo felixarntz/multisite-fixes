@@ -16,7 +16,7 @@ defined( 'ABSPATH' ) || exit;
 class WPMS_SSL_Redirects {
 	public static function maybe_make_url_https( $content ) {
 		if ( self::is_ssl_site() ) {
-			$site = get_blog_details( get_current_blog_id(), false );
+			$site = get_site();
 
 			$content = str_replace( 'http://' . $site->domain, 'https://' . $site->domain, $content );
 		}
@@ -50,20 +50,16 @@ class WPMS_SSL_Redirects {
 			return true;
 		}
 
-		if ( ! $site_id ) {
-			$site_id = get_current_blog_id();
-		}
-
-		$site = get_blog_details( $site_id, false );
-		$network = WP_Network::get_instance( $site->site_id );
+		$site = get_site( $site_id );
+		$network = get_network( $site->network_id );
 
 		$ssl_networks = self::get_ssl_networks();
-		if ( in_array( $network->id, $ssl_networks ) || in_array( $network->domain, $ssl_networks ) ) {
+		if ( in_array( (int) $network->id, $ssl_networks, true ) || in_array( $network->domain, $ssl_networks, true ) ) {
 			return true;
 		}
 
 		$ssl_sites = self::get_ssl_sites();
-		if ( in_array( $site->blog_id, $ssl_sites ) || in_array( $site->domain, $ssl_sites ) ) {
+		if ( in_array( (int) $site->id, $ssl_sites, true ) || in_array( $site->domain, $ssl_sites, true ) ) {
 			return true;
 		}
 
@@ -75,7 +71,18 @@ class WPMS_SSL_Redirects {
 			return array();
 		}
 
-		return array_map( 'trim', explode( ',', SSL_NETWORKS ) );
+		$network_ids = explode( ',', SSL_NETWORKS );
+		foreach ( $network_ids as $index => $network_id ) {
+			$network_id = trim( $network_id );
+
+			if ( is_numeric( $network_id ) ) {
+				$network_id = (int) $network_id;
+			}
+
+			$network_ids[ $index ] = $network_id;
+		}
+
+		return $network_ids;
 	}
 
 	public static function get_ssl_sites() {
@@ -84,6 +91,19 @@ class WPMS_SSL_Redirects {
 		}
 
 		return array_map( 'trim', explode( ',', SSL_SITES ) );
+
+		$site_ids = explode( ',', SSL_SITES );
+		foreach ( $site_ids as $index => $site_id ) {
+			$site_id = trim( $site_id );
+
+			if ( is_numeric( $site_id ) ) {
+				$site_id = (int) $site_id;
+			}
+
+			$site_ids[ $index ] = $site_id;
+		}
+
+		return $site_ids;
 	}
 }
 
