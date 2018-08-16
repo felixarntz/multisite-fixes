@@ -1,5 +1,7 @@
 # Multisite Fixes
 
+**DISCLAIMER: This project is no longer maintained.**
+
 This repository contains a `sunrise.php` and some must-use plugins to address common issues when working with Multisite and Multinetwork.
 
 ## Bundled functionalities
